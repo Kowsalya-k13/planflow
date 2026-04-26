@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PlanFlow — Project Planner</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+  <!-- SheetJS CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <!-- App Stylesheet -->
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ==============================
+       SIDEBAR
+  ============================== -->
+  <aside class="sidebar">
+    <div class="logo">
+      <h1>Plan<span>Flow</span></h1>
+      <p>Project Management</p>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-section">Main</div>
+
+      <div class="nav-item active" onclick="showView('dashboard', this)">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Dashboard
+      </div>
+
+      <div class="nav-item" onclick="showView('kanban', this)">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="5" height="18" rx="1"/>
+          <rect x="10" y="3" width="5" height="12" rx="1"/>
+          <rect x="17" y="3" width="5" height="15" rx="1"/>
+        </svg>
+        Kanban Board
+        <span class="nav-badge" id="kanban-badge">0</span>
+      </div>
+
+      <div class="nav-item" onclick="showView('team', this)">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75M21 21v-2a4 4 0 0 0-3-3.85"/>
+        </svg>
+        Team
+      </div>
+
+      <div class="nav-item" onclick="showView('reports', this)">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        Reports
+      </div>
+
+      <hr class="divider" />
+      <div class="nav-section">Projects</div>
+    </nav>
+
+    <!-- Dynamic project list injected by JS -->
+    <div class="project-list" id="project-list"></div>
+
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="avatar" style="background:rgba(123,108,246,0.2);color:var(--accent)">LK</div>
+        <div class="user-info">
+          <div class="name">Lavanya Kumar</div>
+          <div class="role">Project Lead · MCA-2024</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ==============================
+       MAIN CONTENT
+  ============================== -->
+  <div class="main">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <h2 id="page-title">Dashboard</h2>
+        <p id="page-sub">Overview of your project workspace</p>
+      </div>
+      <div class="topbar-right">
+        <div class="search-wrap">
+          <svg class="search-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input type="text" placeholder="Search tasks..." id="search-input" oninput="searchTasks(this.value)" />
+        </div>
+        <button class="btn btn-amber"  onclick="downloadTemplate()">⬇ Template</button>
+        <button class="btn btn-green"  onclick="openImport()">⬆ Import Excel</button>
+        <button class="btn btn-ghost"  onclick="exportToExcel()">⬇ Export</button>
+        <button class="btn btn-primary" onclick="openAddTask()">+ New Task</button>
+      </div>
+    </div>
+
+    <!-- CONTENT AREA -->
+    <div class="content">
+
+      <!-- DASHBOARD VIEW -->
+      <div class="view active" id="view-dashboard">
+        <div class="stat-grid"  id="stat-grid"></div>
+        <div class="grid2">
+          <div class="card">
+            <div class="card-title">Recent Tasks <span>All projects</span></div>
+            <div id="recent-tasks-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Team Workload</div>
+            <div id="workload-list"></div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="card">
+            <div class="card-title">Activity Feed <span>Latest</span></div>
+            <div id="activity-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Priority Breakdown</div>
+            <div class="chart-wrap" style="height:170px">
+              <canvas id="priority-chart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KANBAN VIEW -->
+      <div class="view" id="view-kanban">
+        <div class="kanban-header">
+          <div class="chips" id="kanban-filters">
+            <div class="chip active" onclick="filterKanban('all', this)">All</div>
+            <div class="chip" onclick="filterKanban('high', this)">High Priority</div>
+            <div class="chip" onclick="filterKanban('medium', this)">Medium</div>
+            <div class="chip" onclick="filterKanban('low', this)">Low Priority</div>
+          </div>
+        </div>
+        <div class="kanban-board" id="kanban-board"></div>
+      </div>
+
+      <!-- TEAM VIEW -->
+      <div class="view" id="view-team">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:14px; gap:8px">
+          <button class="btn btn-ghost"   onclick="exportToExcel()">⬇ Export Excel</button>
+          <button class="btn btn-primary" onclick="openAddMember()">+ Add Member</button>
+        </div>
+        <div class="team-grid" id="team-grid"></div>
+        <div class="card">
+          <div class="card-title">Task Assignment Overview</div>
+          <div class="chart-wrap"><canvas id="team-chart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- REPORTS VIEW -->
+      <div class="view" id="view-reports">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:14px">
+          <button class="btn btn-ghost" onclick="exportToExcel()">⬇ Export Excel</button>
+        </div>
+        <div class="chart-grid">
+          <div class="chart-card">
+            <div class="card-title">Task Status Distribution</div>
+            <div class="chart-wrap"><canvas id="status-chart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="card-title">Weekly Progress</div>
+            <div class="chart-wrap"><canvas id="progress-chart"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Project Timeline</div>
+          <div id="timeline-list" style="margin-top:4px"></div>
+        </div>
+        <div class="grid3" style="margin-top:14px">
+          <div class="card">
+            <div class="card-title">Completion Rate</div>
+            <div class="big-metric" style="color:var(--accent2)" id="completion-rate">0%</div>
+            <div class="metric-sub">of all tasks completed</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Avg. Tasks / Member</div>
+            <div class="big-metric" style="color:var(--accent)" id="avg-tasks">0</div>
+            <div class="metric-sub">tasks per team member</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Overdue Tasks</div>
+            <div class="big-metric" style="color:var(--danger)" id="overdue-count">0</div>
+            <div class="metric-sub">past due date</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+
+
+  <!-- ==============================
+       MODALS
+  ============================== -->
+
+  <!-- ADD / EDIT TASK MODAL -->
+  <div class="modal-overlay" id="task-modal">
+    <div class="modal">
+      <h3 id="task-modal-title">Add New Task</h3>
+      <p class="modal-sub">Fill in the details to create a task</p>
+
+      <div class="form-row">
+        <label>Task Title</label>
+        <input type="text" id="t-title" placeholder="e.g. Design login page" />
+      </div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Project</label>
+          <select id="t-project"></select>
+        </div>
+        <div class="form-row">
+          <label>Assigned To</label>
+          <select id="t-member"></select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Priority</label>
+          <select id="t-priority">
+            <option value="high">High</option>
+            <option value="medium" selected>Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Status</label>
+          <select id="t-status">
+            <option value="todo">To Do</option>
+            <option value="inprogress">In Progress</option>
+            <option value="done">Done</option>
+            <option value="blocked">Blocked</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Due Date</label>
+        <input type="date" id="t-due" />
+      </div>
+      <div class="form-row">
+        <label>Description</label>
+        <textarea id="t-desc" placeholder="Brief description..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"   onclick="closeModal('task-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveTask()">Save Task</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD MEMBER MODAL -->
+  <div class="modal-overlay" id="member-modal">
+    <div class="modal">
+      <h3>Add Team Member</h3>
+      <p class="modal-sub">Add a new member to your team</p>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>First Name</label>
+          <input type="text" id="m-first" placeholder="Riya" />
+        </div>
+        <div class="form-row">
+          <label>Last Name</label>
+          <input type="text" id="m-last" placeholder="Mehta" />
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Role</label>
+        <input type="text" id="m-role" placeholder="Frontend Developer" />
+      </div>
+      <div class="form-row">
+        <label>Skills (comma separated)</label>
+        <input type="text" id="m-skills" placeholder="HTML, CSS, JavaScript" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"   onclick="closeModal('member-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveMember()">Add Member</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD PROJECT MODAL -->
+  <div class="modal-overlay" id="project-modal">
+    <div class="modal">
+      <h3>New Project</h3>
+      <p class="modal-sub">Create a new project to organise your work</p>
+      <div class="form-row">
+        <label>Project Name</label>
+        <input type="text" id="pr-name" placeholder="Library Management System" />
+      </div>
+      <div class="form-row">
+        <label>Description</label>
+        <textarea id="pr-desc" placeholder="What is this project about?"></textarea>
+      </div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Start Date</label>
+          <input type="date" id="pr-start" />
+        </div>
+        <div class="form-row">
+          <label>End Date</label>
+          <input type="date" id="pr-end" />
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Color</label>
+        <div style="display:flex; gap:8px; margin-top:6px" id="color-picker">
+          <div class="color-opt" style="background:#7B6CF6; border:2px solid white" onclick="selectColor('#7B6CF6', this)"></div>
+          <div class="color-opt" style="background:#5BCBAF" onclick="selectColor('#5BCBAF', this)"></div>
+          <div class="color-opt" style="background:#F5A623" onclick="selectColor('#F5A623', this)"></div>
+          <div class="color-opt" style="background:#E2514A" onclick="selectColor('#E2514A', this)"></div>
+          <div class="color-opt" style="background:#7EC8E3" onclick="selectColor('#7EC8E3', this)"></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost"   onclick="closeModal('project-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveProject()">Create Project</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORT EXCEL MODAL -->
+  <div class="modal-overlay" id="import-modal">
+    <div class="modal" style="width:580px">
+      <h3>Import from Excel</h3>
+      <p class="modal-sub">Upload your .xlsx file — Projects, Members, and Tasks are read from separate sheets</p>
+
+      <div class="format-info">
+        <p>Expected sheet names &amp; columns:</p>
+        <ul>
+          <li><span>Projects</span> → Name | Description | Color | Start Date | End Date</li>
+          <li><span>Members</span>  → Name | Role | Skills</li>
+          <li><span>Tasks</span>    → Title | Project | Assigned To | Priority | Status | Due Date | Description</li>
+        </ul>
+      </div>
+
+      <div class="drop-zone" id="drop-zone"
+        onclick="document.getElementById('file-input').click()"
+        ondragover="dzOver(event)"
+        ondragleave="dzLeave(event)"
+        ondrop="dzDrop(event)">
+        <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <p>Drop your Excel file here, or click to browse</p>
+        <span id="file-name">Supports .xlsx and .xls files</span>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" onchange="handleFile(this)" />
+
+      <div id="preview-section" style="display:none; margin-top:16px">
+        <div class="import-summary" id="import-summary"></div>
+        <div class="sheet-tabs"     id="sheet-tabs"></div>
+        <div class="preview-table-wrap">
+          <table class="preview-table" id="preview-table"></table>
+        </div>
+        <div id="import-error" class="error-msg"></div>
+      </div>
+
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="btn btn-ghost"   onclick="closeModal('import-modal')">Cancel</button>
+        <button class="btn btn-danger"  id="replace-btn" style="display:none" onclick="confirmImport(true)">Replace All Data</button>
+        <button class="btn btn-primary" id="merge-btn"   style="display:none" onclick="confirmImport(false)">Merge &amp; Import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div class="toast" id="toast">
+    <div class="toast-dot" id="toast-dot"></div>
+    <span id="toast-msg"></span>
+  </div>
+
+
+  <!-- ==============================
+       JAVASCRIPT FILES  (order matters)
+  ============================== -->
+  <script src="js/data.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/kanban.js"></script>
+  <script src="js/team.js"></script>
+  <script src="js/reports.js"></script>
+  <script src="js/excel.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
